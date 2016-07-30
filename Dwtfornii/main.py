@@ -1,7 +1,12 @@
 import pywt
 import numpy as np
+import os
 from medpy.io import load
+from sklearn import preprocessing
+from sklearn import decomposition
 
+
+stdPath = r"/mnt/hgfs/linux_shared/20160718/std"
 
 def xdwtfun(data, wname):
     matSize = np.shape(data)
@@ -117,10 +122,48 @@ def dwt3funN(data, N, wname):
         data = result[0]
     return result
 
+def dataPreprocess(data,target):
+    #normalize
+    scaler = preprocessing.StandardScaler()
+    scaler.fit(data)
+    data_normalized = scaler.transform(data)
+    #PCA
+    pca = decomposition.PCA(n_components =0.95)
+    data_prime = pca.fit(data_normalized)
+    #binarize
+    label_binarizer = preprocessing.LabelBinarizer()
+    new_target = label_binarizer.transform(target)
+    return data_prime,new_target
 
-image_data, image_header = load(r'avg152T1_RL_nifti.nii.gz')
-print image_data.shape, image_data.dtype
-# LLL,LLH,LHL,LHH,HLL,HLH,HHL,HHH= dwt3fun(image_data,r'db2')
-# idwt_data = idwt3fun(LLL,LLH,LHL,LHH,HLL,HLH,HHL,HHH,r'db2')
-LLL = dwt3funN(image_data, 3, r'db2')
-print LLL[0].shape
+def calDWTforClass(filepath,tag,level,wname):
+    classPath = os.path.join(filepath,tag)
+    for childfold in os.listdir(classPath):
+        child_fold_path = os.path.join(classPath,childfold)
+        for file in os.listdir(child_fold_path):
+            if file.endswith(".nii.gz"):
+                file_path = os.path.join(child_fold_path,file)
+                image_data,image_header = load(file_path)
+                coef = dwt3funN(image_data,level,wname)
+                coef = coef[0].flatten()
+                coef_file = os.path.join(child_fold_path,"coef_"+childfold+".txt")
+                np.savetxt(coef_file,coef,fmt="%.8e")
+
+def createDataMatrix(filepath,tag):
+    classPath = os.path.join(filepath, tag)
+    for childfold in os.listdir(classPath):
+        child_fold_path = os.path.join(classPath, childfold)
+        for file in os.listdir(child_fold_path):
+            if file.startswith("coef_"):
+                pass
+
+
+# calDWTforClass(stdPath,"AD",3,'db2')
+calDWTforClass(stdPath,"MCI",3,'db2')
+calDWTforClass(stdPath,"NC",3,'db2')
+
+# image_data, image_header = load(r'avg152T1_RL_nifti.nii.gz')
+# print image_data.shape, image_data.dtype
+# # LLL,LLH,LHL,LHH,HLL,HLH,HHL,HHH= dwt3fun(image_data,r'db2')
+# # idwt_data = idwt3fun(LLL,LLH,LHL,LHH,HLL,HLH,HHL,HHH,r'db2')
+# LLL = dwt3funN(image_data, 3, r'db2')
+# print LLL[0].shape
